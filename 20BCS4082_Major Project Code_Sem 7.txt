@@ -1,0 +1,76 @@
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
+import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.services.glue.AWSGlue;
+import com.amazonaws.services.glue.AWSGlueClientBuilder;
+import com.amazonaws.services.glue.model;
+import com.amazonaws.services.glue.model.DatabaseInput;
+
+class BigDataAnalyticsOnAWS {
+
+    public static void main(String[] args) {
+        // AWS credentials
+        String accessKey = "AKIA5JVXPIXWVYY7AUDQ";
+        String secretKey = "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";
+
+        // AWS Glue configuration
+        String glueEndpoint = "https://glue.us-east-1.amazonaws.com";
+        String region = "us-east-1"; // Change to your desired region
+        String dbName = "database-1";
+        String tableName = "table1";
+        String s3Bucket = "abhibhai";
+        String scriptLocation = "s3://your-s3-bucket/glue-scripts/your-etl-script.py";
+
+        // Set up AWS credentials
+        BasicAWSCredentials awsCreds = new BasicAWSCredentials(accessKey, secretKey);
+
+        // Create AWS Glue client
+        AWSGlue glueClient = AWSGlueClientBuilder.standard()
+                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(glueEndpoint, region))
+                .withCredentials(new AWSStaticCredentialsProvider(awsCreds))
+                .build();
+
+        // Create a database
+        CreateDatabaseRequest createDatabaseRequest = new CreateDatabaseRequest()
+                .withDatabaseInput(new DatabaseInput().withName(dbName));
+        glueClient.createDatabase(createDatabaseRequest);
+
+        // Define AWS Glue ETL job parameters
+        Job job = new Job();
+        job.setName("YourETLJobName");
+        job.setRole("AWSGlueServiceRole-DefaultRole");
+        job.setCommand(new JobCommand()
+                .withName("glueetl")
+                .withScriptLocation(scriptLocation));
+
+        // Set up input and output tables
+        StorageDescriptor inputSD = new StorageDescriptor().withLocation("s3://your-s3-bucket/input-data/");
+        StorageDescriptor outputSD = new StorageDescriptor().withLocation("s3://your-s3-bucket/output-data/");
+
+        Table inputTable = new Table()
+                .withName("input_table")
+                .withDatabaseName(dbName)
+                .withStorageDescriptor(inputSD);
+        Table outputTable = new Table()
+                .withName(tableName)
+                .withDatabaseName(dbName)
+                .withStorageDescriptor(outputSD);
+
+        job.setInputTable(inputTable);
+        job.setOutputTable(outputTable);
+
+        // Create and run the ETL job
+        CreateJobRequest createJobRequest = new CreateJobRequest()
+                .withName(job.getName())
+                .withRole(job.getRole())
+                .withCommand(job.getCommand())
+                .withDefaultArguments(job.getDefaultArguments())
+                .withConnections(job.getConnections())
+                .withMaxRetries(job.getMaxRetries());
+
+        glueClient.createJob(createJobRequest);
+
+        // Run the job
+        StartJobRunRequest startJobRunRequest = new StartJobRunRequest().withJobName(job.getName());
+        glueClient.startJobRun(startJobRunRequest);
+    }
+}
